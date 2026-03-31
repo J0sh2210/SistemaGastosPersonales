@@ -37,25 +37,40 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # 4. TU FUNCIÓN ACTUALIZADA
+# ... (Tus puntos 1, 2 y 3 se mantienen igual, están perfectos)
+
+# 4. TU FUNCIÓN DEFINITIVA Y ROBUSTA
 def ejecutar_sp(nombre_sp: str, params: list = None):
+    results = []  # Inicializamos siempre como lista vacía para evitar errores de referencia
     try:
-        # AQUÍ ESTABA EL CAMBIO: Usamos DB_CONNECTION_STRING, no la URL
+        # Usamos DB_CONNECTION_STRING directamente con pyodbc
         with pyodbc.connect(DB_CONNECTION_STRING, autocommit=True) as conn:
             with conn.cursor() as cursor:
-                # Corregimos el espacio del placeholder
+                # Construcción del comando EXEC nombre_sp ?, ?, ?
+                # Importante: SQL Server es estricto con las comas entre los ?
                 placeholder = ', '.join(['?'] * len(params)) if params else ""
                 sql = f"EXEC {nombre_sp} {placeholder}"
                 
+                # Ejecución
                 cursor.execute(sql, params or [])
                 
-                if cursor.description:
-                    columns = [column[0] for column in cursor.description]
-                    results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-                    return results
-                else:
+                # Bucle para capturar el conjunto de resultados correcto 
+                # (A veces el primer set es solo el conteo de filas afectadas)
+                while True:
+                    if cursor.description:
+                        columns = [column[0] for column in cursor.description]
+                        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                        return results # Si encontramos datos, los devolvemos de inmediato
+                    
+                    if not cursor.nextset():
+                        break
+                
+                # Si llegamos aquí y no hubo SELECT, pero el SP corrió bien:
+                return [{"status": "success"}]
 
-                    return results if results else [{"status": "success"}]
     except Exception as e:
+        # Extraemos el mensaje de error de SQL si existe
         error_msg = str(e.args[1]) if len(e.args) > 1 else str(e)
-        print(f"Error en DB: {error_msg}")
+        print(f"Error en DB ejecutando {nombre_sp}: {error_msg}")
+        # Re-lanzamos el error para que el controlador (router) lo atrape
         raise Exception(error_msg)
