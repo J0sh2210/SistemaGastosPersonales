@@ -86,39 +86,42 @@ async def recibir_mensaje(request: Request):
                             datos_previos = user['DatosTemporales']
 
                             if estado_bot == 'IDLE':
-                                if "gasto" in mensaje_lower or "ingreso" in mensaje_lower:
+                                if "resumen" in mensaje_lower:
+                                    id_tipo = 2 if "gasto" in mensaje_lower else 1
+                                    tipo_nombre = "gastos" if id_tipo == 2 else "ingresos"
+
+                                    # 1. Llamamos al SP
+                                    resultado = ejecutar_sp("sp_MostrarMovimientosTotales", [id_usuario, id_tipo])
+                                    ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'IDLE', None])
+
+                                    # 2. Validamos que el SP devolvió datos
+                                    if resultado:
+                                        # Extraemos los valores (Asegúrate que los nombres coincidan con tu SELECT en SQL)
+                                        monto_total = resultado[0].get('SaldoTotal', 0) or 0
+                                        conteo = resultado[0].get('TotalMovimientos', 0) or 0 # <--- Cambia 'Cantidad' por el nombre de tu columna en el SP
+                                        
+                                        # 3. Armamos la respuesta rica en info
+                                        respuesta = (
+                                            f"📊 *Resumen de {tipo_nombre.capitalize()}*\n\n"
+                                            f"✅ Se han encontrado: *{conteo}* movimientos.\n"
+                                            f"💰 Saldo total: *Q{monto_total:.2f}*"
+                                        )
+                                    else:
+                                        respuesta = f"Aún no tienes {tipo_nombre} registrados."
+
+                                    await enviar_mensaje_whatsapp(telefono, respuesta)
+                                    
+                                    return {"status": "ok"}
+                                
+
+                                elif "gasto" in mensaje_lower or "ingreso" in mensaje_lower:
                                     id_tipo = 2 if "gasto" in mensaje_lower else 1
                                     tipo_txt = "Gasto" if id_tipo == 2 else "Ingreso"
                                     ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'ESPERANDO_CONCEPTO', str(id_tipo)])
                                     respuesta = f"Okey {nombre}, vamos a registrar un {tipo_txt}.💰 ¿Cuál es el concepto?"
                                     await enviar_mensaje_whatsapp(telefono, respuesta)
 
-                            if "resumen" in mensaje_lower:
-                                id_tipo = 2 if "gasto" in mensaje_lower else 1
-                                tipo_nombre = "gastos" if id_tipo == 2 else "ingresos"
-
-                                # 1. Llamamos al SP
-                                resultado = ejecutar_sp("sp_MostrarMovimientosTotales", [id_usuario, id_tipo])
-
-                                # 2. Validamos que el SP devolvió datos
-                                if resultado:
-                                    # Extraemos los valores (Asegúrate que los nombres coincidan con tu SELECT en SQL)
-                                    monto_total = resultado[0].get('SaldoTotal', 0) or 0
-                                    conteo = resultado[0].get('TotalMovimientos', 0) or 0 # <--- Cambia 'Cantidad' por el nombre de tu columna en el SP
-                                    
-                                    # 3. Armamos la respuesta rica en info
-                                    respuesta = (
-                                        f"📊 *Resumen de {tipo_nombre.capitalize()}*\n\n"
-                                        f"✅ Se han encontrado: *{conteo}* movimientos.\n"
-                                        f"💰 Saldo total: *Q{monto_total:.2f}*"
-                                    )
-                                else:
-                                    respuesta = f"Aún no tienes {tipo_nombre} registrados."
-
-                                await enviar_mensaje_whatsapp(telefono, respuesta)
-                                return {"status": "ok"}
-                                
-
+                            
                             elif estado_bot == 'ESPERANDO_CONCEPTO':
                                 combo_datos = f"{datos_previos}|{mensaje_cliente}"
                                 ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'ESPERANDO_MONTO', combo_datos])
