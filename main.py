@@ -9,7 +9,7 @@ from sqlalchemy import text
 app = FastAPI(title = "API de Gastos Personales")
 
 
-# 🔌 Conexión a la DB
+
 def get_db():
     db = SessionLocal()
     try:
@@ -18,8 +18,8 @@ def get_db():
         db.close()
 
 app.include_router(Usuario_router)  
-app.include_router(Whatsapp_router)  # Asegúrate de importar tu router de WhatsAppController.py y agregarlo aquí
-# 🏠 Ruta base
+app.include_router(Whatsapp_router)  
+
 @app.get("/")
 def inicio():
     return {"mensaje": "API funcionando con SQL Server 🚀"}

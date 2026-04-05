@@ -15,3 +15,12 @@ class UsuarioRegistro(BaseModel):
 class MensajeWhatsApp(BaseModel):
     telefono: str
     mensaje: str
+
+class ConsultaMovimientoTotal(BaseModel):
+    fecha_inicio: str
+    fecha_fin: str
+    categoria: Optional[str] = None
+
+class consultaMovimientoCategoria(BaseModel):
+    IdUsuario: int
+    categoria: str

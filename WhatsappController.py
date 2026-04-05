@@ -6,9 +6,12 @@ router = APIRouter(
     prefix="/webhook",
     tags=["WhatsApp Bot"]
 )
+router = APIRouter(
+    prefix="/webhook",
+    tags=["WhatsApp Bot"]
+)
 
-# --- 1. CONFIGURACIÓN Y FUNCIÓN DE ENVÍO (DEBE IR ARRIBA) ---
-TOKEN_META = "EAANvrLZC1sGEBRMZC1POXpRUxAxgK6x93stw3jMUlZCBl8j3FyWcjCbxShaVriZA4mMckwC2TIKV6gs4ZBZANK2LMx1otInZBZBVHZC4NLHPJkWaParPlQ2TfEAkJPl0QsHRXqHIN3LYZBCbdTzMDgvvEy4a25RxJBaZBEkyiUZCOZBiuaJE45ewXZAzNMZC7dZA7n1q1RrH4RSMzPzBoHTzecxiWZCa8DxbdfElUZAXI6Kc7PgFCIA5mYVb5OiIEs1frSTWcIgLdInbwEIZAcWuUO4hDx21ye8WHUNuFjWPVJLlj5jeQZDZD"
+TOKEN_META = "EAANvrLZC1sGEBRN7DYoZB54Nl6mY0e6S5WIZA2JxtZA5n6C0kjlTfwiIdPRaZCOZCoMV5fZAVoEEiDx3ZArOZCDGaKGZC7iqXZBgzV06piD0dWo3knhrQZCDwhUiN7L47uU9AVIz3BmmtvKBbDNjyypPb4d1s6yUemVE83BcPf5mMFaUwkGNQTzTco42yeIWCCoSbs77oTgGXMDZAz9wNtIb5ZAWGBbskS9yoF7R9WgvdhB3DSABYwfIkkh7X7JBzxFRlNRgklUZBgHTVZC5J8lrohMSiDqMCaZAStZAS8XxypPimNtwZDZD"
 ID_TELEFONO_META = "1115752214944142"
 
 async def enviar_mensaje_whatsapp(telefono_destino, texto):
@@ -29,7 +32,6 @@ async def enviar_mensaje_whatsapp(telefono_destino, texto):
         if response.status_code != 200:
             print(f"❌ Error enviando mensaje a Meta: {response.text}")
 
-# --- 2. ENDPOINT DE VERIFICACIÓN (GET) ---
 @router.get("/mensaje")
 async def verificar_webhook(request: Request):
     params = request.query_params
@@ -45,7 +47,6 @@ async def verificar_webhook(request: Request):
     
     return Response(content="Error", status_code=403)
 
-# --- 3. ENDPOINT DE RECEPCIÓN (POST) ---
 @router.post("/mensaje")
 async def recibir_mensaje(request: Request):
     body = await request.json()
@@ -63,7 +64,6 @@ async def recibir_mensaje(request: Request):
                             mensaje_cliente = mensaje_texto.strip()
                             mensaje_lower = mensaje_cliente.lower()
 
-                            # --- COMANDO CANCELAR ---
                             if "cancelar" in mensaje_lower:
                                 usuario_info = ejecutar_sp("sp_ValidarAccesoWhatsapp", [telefono])
                                 if usuario_info:
@@ -72,7 +72,6 @@ async def recibir_mensaje(request: Request):
                                 await enviar_mensaje_whatsapp(telefono, respuesta)
                                 return {"status": "ok"}
 
-                            # --- VALIDACIÓN DE ACCESO ---
                             usuario_info = ejecutar_sp("sp_ValidarAccesoWhatsapp", [telefono])
                             if not usuario_info:
                                 respuesta = "❌ Hola, no estás registrado en el sistema."
@@ -85,7 +84,6 @@ async def recibir_mensaje(request: Request):
                             estado_bot = user['EstadoActual']
                             datos_previos = user['DatosTemporales']
 
-                            # --- MÁQUINA DE ESTADOS ---
                             if estado_bot == 'IDLE':
                                 if "gasto" in mensaje_lower or "ingreso" in mensaje_lower:
                                     id_tipo = 2 if "gasto" in mensaje_lower else 1
@@ -93,9 +91,32 @@ async def recibir_mensaje(request: Request):
                                     ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'ESPERANDO_CONCEPTO', str(id_tipo)])
                                     respuesta = f"Okey {nombre}, vamos a registrar un {tipo_txt}.💰 ¿Cuál es el concepto?"
                                     await enviar_mensaje_whatsapp(telefono, respuesta)
+
+                            if "resumen" in mensaje_lower:
+                                id_tipo = 2 if "gasto" in mensaje_lower else 1
+                                tipo_nombre = "gastos" if id_tipo == 2 else "ingresos"
+
+                                # 1. Llamamos al SP
+                                resultado = ejecutar_sp("sp_MostrarMovimientosTotales", [id_usuario, id_tipo])
+
+                                # 2. Validamos que el SP devolvió datos
+                                if resultado:
+                                    # Extraemos los valores (Asegúrate que los nombres coincidan con tu SELECT en SQL)
+                                    monto_total = resultado[0].get('SaldoTotal', 0) or 0
+                                    conteo = resultado[0].get('TotalMovimientos', 0) or 0 # <--- Cambia 'Cantidad' por el nombre de tu columna en el SP
+                                    
+                                    # 3. Armamos la respuesta rica en info
+                                    respuesta = (
+                                        f"📊 *Resumen de {tipo_nombre.capitalize()}*\n\n"
+                                        f"✅ Se han encontrado: *{conteo}* movimientos.\n"
+                                        f"💰 Saldo total: *Q{monto_total:.2f}*"
+                                    )
                                 else:
-                                    respuesta = f"Hola {nombre}, escribe 'Gasto' o 'Ingreso' para empezar."
-                                    await enviar_mensaje_whatsapp(telefono, respuesta)
+                                    respuesta = f"Aún no tienes {tipo_nombre} registrados."
+
+                                await enviar_mensaje_whatsapp(telefono, respuesta)
+                                return {"status": "ok"}
+                                
 
                             elif estado_bot == 'ESPERANDO_CONCEPTO':
                                 combo_datos = f"{datos_previos}|{mensaje_cliente}"
@@ -107,7 +128,6 @@ async def recibir_mensaje(request: Request):
                                 try:
                                     monto = float(mensaje_lower.replace(',', '.'))
                                     partes = str(datos_previos).split('|')
-                                    # [IdUsuario, Monto, Concepto, Tipo, Categoria, Fuente]
                                     parametros = [id_usuario, monto, partes[1], int(partes[0]), "General", "WhatsApp Bot"]
                                     
                                     ejecutar_sp("sp_RegistrarMovimiento", parametros)
@@ -121,6 +141,8 @@ async def recibir_mensaje(request: Request):
                                     print(f"Error en monto: {e}")
                                     respuesta = "❌ Monto inválido. Envía solo números (ej: 50.00)."
                                     await enviar_mensaje_whatsapp(telefono, respuesta)
+                            #Utilizar sp para obtener el total de gastos o ingresos y devolver el total en un mensaje
+
 
         return {"status": "success"}
     except Exception as e:
