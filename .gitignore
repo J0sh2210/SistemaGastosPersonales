@@ -1,52 +1,52 @@
-### Python
-# Byte-compiled files
+# --- SEGURIDAD Y CREDENCIALES ---
+# Evita subir tus tokens y contraseñas de Azure/Meta
+.env
+*.env
+env/
+venv/
+ENV/
+
+# --- PYTHON ---
+# Archivos compilados y temporales de Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
 *.egg
 
-# dotenv environment variable files
-.env
+# --- BASE DE DATOS ---
+# Archivos temporales o de logs de SQL Server si usaras locales
+*.log
+*.sql.bak
+*.sql.tmp
 
-# Virtual environments
-.venv
-env/
-venv/
+# --- DOCKER ---
+# Si bien el Dockerfile se sube, a veces hay logs de docker
+.dockerignore
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.pytest_cache/
-
-# Type checkers
-.mypy_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-# .python-version
-
-### Windows
-# Windows thumbnail cache files
+# --- EDITORES Y SISTEMA ---
+# Archivos basura de Windows, Mac o Editores de código
+.vscode/
+.idea/
+.DS_Store
 Thumbs.db
+desktop.ini
 
-# Folder config file
-[Dd]esktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# Windows shortcuts
-*.lnk
+# --- VIRTUAL ENV ---
+# Carpeta de entorno virtual (muy importante no subirla)
+venv/
+.venv/
