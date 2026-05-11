@@ -1,6 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request, Response
 from database import ejecutar_sp
 import httpx
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 router = APIRouter(
     prefix="/webhook",
@@ -11,9 +16,8 @@ router = APIRouter(
     tags=["WhatsApp Bot"]
 )
 
-# --- 1. CONFIGURACIÓN Y FUNCIÓN DE ENVÍO (DEBE IR ARRIBA) ---
-TOKEN_META = "EAANvrLZC1sGEBRMgoJCLE4JwUmDAgB9Ieiubou0M8muMKDhTnUpB3L3eH9Iw5llZAFXYGviVqHucxGHtwZCbr1E0ykW7t5p29ZAf8ZCKFEHzu63P27avzfq7QXLGecpSBHg44CZCGc0f9PuZAw7TFXLRReCG4O7DZAu5mnvq98Y6XzyPwiB6UTaAVcrNe4jEfEGYfa4xcxlV5Y9JqZAvn1zwSDkpZCCsXZBdJnftQnKXMhFm8raTZAvCfZBSVUe3iBP2MrA6fqLnrLOvRh3ZAZBE74ZC3oVjWezK3OY0oq0EbDrZApwZDZD"
-ID_TELEFONO_META = "1115752214944142"
+TOKEN_META = os.getenv("TOKENMETA")
+ID_TELEFONO_META = os.getenv("ID_TELEFONO_META")
 
 async def enviar_mensaje_whatsapp(telefono_destino, texto):
     url = f"https://graph.facebook.com/v18.0/{ID_TELEFONO_META}/messages"
@@ -90,17 +94,14 @@ async def recibir_mensaje(request: Request):
                                     id_tipo = 2 if "gasto" in mensaje_lower else 1
                                     tipo_nombre = "gastos" if id_tipo == 2 else "ingresos"
 
-                                    # 1. Llamamos al SP
                                     resultado = ejecutar_sp("sp_MostrarMovimientosTotales", [id_usuario, id_tipo])
                                     ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'IDLE', None])
 
-                                    # 2. Validamos que el SP devolvió datos
                                     if resultado:
-                                        # Extraemos los valores (Asegúrate que los nombres coincidan con tu SELECT en SQL)
+
                                         monto_total = resultado[0].get('SaldoTotal', 0) or 0
-                                        conteo = resultado[0].get('TotalMovimientos', 0) or 0 # <--- Cambia 'Cantidad' por el nombre de tu columna en el SP
+                                        conteo = resultado[0].get('TotalMovimientos', 0) or 0 
                                         
-                                        # 3. Armamos la respuesta rica en info
                                         respuesta = (
                                             f"📊 *Resumen de {tipo_nombre.capitalize()}*\n\n"
                                             f"✅ Se han encontrado: *{conteo}* movimientos.\n"
@@ -112,6 +113,21 @@ async def recibir_mensaje(request: Request):
                                     await enviar_mensaje_whatsapp(telefono, respuesta)
                                     
                                     return {"status": "ok"}
+                                
+                                elif "resumen" in mensaje_lower and "saldo" in mensaje_lower:
+                                    resultado = ejecutar_sp("sp_ObtenerResumenMensual", [id_usuario])
+                                    ejecutar_sp("sp_ActualizarEstadoBot", [id_usuario, 'IDLE', None])
+
+                                    if resultado:
+                                        saldo_actual = resultado[0].get('SaldoGlobal', 0) or 0
+                                        respuesta = f"💼 Tu saldo actual es: *Q{saldo_actual:.2f}*"
+                                    else:
+                                        respuesta = "Aún no tienes movimientos registrados para mostrar un saldo."
+
+                                    await enviar_mensaje_whatsapp(telefono, respuesta)
+                                    
+                                    return {"status": "ok"}
+
                                 
 
                                 elif "gasto" in mensaje_lower or "ingreso" in mensaje_lower:
@@ -145,7 +161,6 @@ async def recibir_mensaje(request: Request):
                                     print(f"Error en monto: {e}")
                                     respuesta = "❌ Monto inválido. Envía solo números (ej: 50.00)."
                                     await enviar_mensaje_whatsapp(telefono, respuesta)
-                            #Utilizar sp para obtener el total de gastos o ingresos y devolver el total en un mensaje
 
 
         return {"status": "success"}

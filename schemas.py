@@ -6,7 +6,7 @@ class UsuarioRegistro(BaseModel):
     segundo_nombre: Optional[str] = None
     primer_apellido: str
     segundo_apellido: Optional[str] = None
-    correo: EmailStr # Valida automáticamente que sea un email real
+    correo: EmailStr 
     telefono_wa: str
     provider_user_id: str
     contrasena: Optional[str] = None

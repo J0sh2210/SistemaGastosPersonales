@@ -4,8 +4,6 @@ from database import SessionLocal
 from UsuarioRegistroController import router as Usuario_router
 from WhatsappController import router as Whatsapp_router
 
-from sqlalchemy import text
-
 app = FastAPI(title = "API de Gastos Personales")
 
 
@@ -22,4 +20,4 @@ app.include_router(Whatsapp_router)
 
 @app.get("/")
 def inicio():
-    return {"mensaje": "API funcionando con SQL Server 🚀"}
+    return {"mensaje": "Bienvenido a la API de Gastos Personales"}
